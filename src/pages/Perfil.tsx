@@ -1,7 +1,6 @@
 /**
  * Página de Perfil do Usuário
- * 
- * Permite o usuário:
+ * * Permite o usuário:
  * - Visualizar e editar suas informações
  * - Ver estatísticas de posts e comentários
  * - Gerenciar configurações de privacidade
@@ -21,14 +20,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { gerarAvatarPlaceholder } from "@/lib/utilidades";
+import { useTheme } from "@/hooks/use-theme"; // Importação Corrigida
 
 const Perfil = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [temaEscuro, setTemaEscuro] = useState(
-    document.documentElement.classList.contains("dark")
-  );
-
+  
+  // USA O HOOK DE TEMA AGORA
+  const { temaEscuro, alternarTema } = useTheme(); //
+  
   // Estado do usuário (simulado)
   const [usuario, setUsuario] = useState({
     apelido: "JamantaBombada",
@@ -41,20 +41,6 @@ const Perfil = () => {
     reacoesRecebidas: 234,
     mostrarApelidoPublicamente: false,
   });
-
-  const alternarTema = () => {
-    setTemaEscuro((prev) => {
-      const novoTema = !prev;
-      if (novoTema) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("tema", "escuro");
-      } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("tema", "claro");
-      }
-      return novoTema;
-    });
-  };
 
   const salvarAlteracoes = () => {
     toast({

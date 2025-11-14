@@ -1,7 +1,6 @@
 /**
  * Página Premium
- * 
- * Mostra os benefícios do plano premium
+ * * Mostra os benefícios do plano premium
  * e permite upgrade por R$ 9,90/mês
  */
 
@@ -13,27 +12,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "@/hooks/use-theme"; // Importação Corrigida
 
 const Premium = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [temaEscuro, setTemaEscuro] = useState(
-    document.documentElement.classList.contains("dark")
-  );
-
-  const alternarTema = () => {
-    setTemaEscuro((prev) => {
-      const novoTema = !prev;
-      if (novoTema) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("tema", "escuro");
-      } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("tema", "claro");
-      }
-      return novoTema;
-    });
-  };
+  
+  // USA O HOOK DE TEMA AGORA
+  const { temaEscuro, alternarTema } = useTheme(); //
 
   const handleAssinar = () => {
     toast({

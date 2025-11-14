@@ -1,7 +1,6 @@
 /**
  * Página Principal - DesabafaAí
- * 
- * Página inicial do aplicativo que contém:
+ * * Página inicial do aplicativo que contém:
  * - Cabeçalho com autenticação
  * - Feed de posts com filtros
  * - Barra lateral com formulário de postagem e status do usuário
@@ -16,6 +15,7 @@ import { BarraFiltros } from "@/components/BarraFiltros";
 import { StatusUsuario } from "@/components/StatusUsuario";
 import { useToast } from "@/hooks/use-toast";
 import { gerarAvatarPlaceholder } from "@/lib/utilidades";
+import { useTheme } from "@/hooks/use-theme"; // Importação Corrigida
 
 // Tipo para os posts
 interface Post {
@@ -86,13 +86,66 @@ const POSTS_MOCK: Post[] = [
     emAlta: true,
     novo: false,
   },
+  // Mais posts mockados para simular a rolagem
+  {
+    id: 6,
+    tipo: "desabafo" as const,
+    conteudo: "Meu TCC está me matando, sério. Não durmo faz três dias e meu orientador só critica. A pressão é insuportável.",
+    dataPublicacao: "2025-11-12T10:00:00Z",
+    totalComentarios: 10,
+    totalReacoes: 30,
+    emAlta: false,
+    novo: false,
+  },
+  {
+    id: 7,
+    tipo: "fofoca" as const,
+    conteudo: "A vizinha do 501 tá saindo escondido com o porteiro novo. Vi os dois de mãos dadas no elevador de serviço! Choque total na vizinhança. Mas shhh, segredo!",
+    dataPublicacao: "2025-11-11T14:30:00Z",
+    totalComentarios: 50,
+    totalReacoes: 150,
+    emAlta: true,
+    novo: false,
+  },
+  {
+    id: 8,
+    tipo: "confissao" as const,
+    conteudo: "Eu nunca assisti Star Wars. Fingi que assisti a vida toda pra não ser excluído dos papos nerds. Desculpa, mundo.",
+    dataPublicacao: "2025-11-11T09:00:00Z",
+    totalComentarios: 5,
+    totalReacoes: 10,
+    emAlta: false,
+    novo: false,
+  },
+  {
+    id: 9,
+    tipo: "desabafo" as const,
+    conteudo: "Minha gata me odeia. Ela só me dá patada e morde quando eu tento fazer carinho. Eu só queria um pouco de amor felino, é pedir muito?",
+    dataPublicacao: "2025-11-10T18:00:00Z",
+    totalComentarios: 20,
+    totalReacoes: 60,
+    emAlta: false,
+    novo: false,
+  },
+  {
+    id: 10,
+    tipo: "desabafo" as const,
+    conteudo: "Acho que sou a única pessoa do meu ciclo social que não tem dinheiro para viajar. Fico vendo as fotos e dá uma inveja triste, saca? Queria ter mais sorte na vida profissional.",
+    dataPublicacao: "2025-11-09T11:00:00Z",
+    totalComentarios: 25,
+    totalReacoes: 75,
+    emAlta: true,
+    novo: false,
+  },
 ];
 
 const Index = () => {
   const { toast } = useToast();
   
+  // USA O HOOK DE TEMA AGORA
+  const { temaEscuro, alternarTema } = useTheme();
+
   // Estados da aplicação
-  const [temaEscuro, setTemaEscuro] = useState(false);
   const [estaLogado, setEstaLogado] = useState(false);
   const [usuario, setUsuario] = useState({
     apelido: "Anônimo",
@@ -107,32 +160,6 @@ const Index = () => {
   
   // Estados dos posts
   const [posts, setPosts] = useState<Post[]>(POSTS_MOCK);
-
-  // Inicializa o tema baseado na preferência do sistema ou localStorage
-  useEffect(() => {
-    const temaSalvo = localStorage.getItem("tema");
-    const prefereSistemaEscuro = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    
-    if (temaSalvo === "escuro" || (!temaSalvo && prefereSistemaEscuro)) {
-      setTemaEscuro(true);
-      document.documentElement.classList.add("dark");
-    }
-  }, []);
-
-  // Alterna o tema
-  const alternarTema = () => {
-    setTemaEscuro((prev) => {
-      const novoTema = !prev;
-      if (novoTema) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("tema", "escuro");
-      } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("tema", "claro");
-      }
-      return novoTema;
-    });
-  };
 
   // Simula o login do usuário
   const handleLogin = () => {
@@ -248,7 +275,7 @@ const Index = () => {
       <main className="container py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Coluna Principal - Feed */}
-          <div className="lg:col-span-2 space-y-6 lg:min-h-screen">
+          <div className="lg:col-span-2 space-y-6">
             {/* Barra de Filtros */}
             <BarraFiltros
               filtroOrdem={filtroOrdem}

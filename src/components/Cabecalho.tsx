@@ -1,7 +1,6 @@
 /**
  * Componente Cabeçalho
- * 
- * Barra de navegação principal com:
+ * * Barra de navegação principal com:
  * - Logo do site
  * - Alternador de tema (claro/escuro)
  * - Botões de autenticação (login/logout)
@@ -18,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useNavigate } from "react-router-dom"; // Importação Adicionada
 
 interface CabecalhoProps {
   temaEscuro: boolean;
@@ -39,11 +39,16 @@ export function Cabecalho({
   aoClicarLogin,
   aoClicarLogout,
 }: CabecalhoProps) {
+  const navigate = useNavigate(); // Hook Adicionado
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="container flex h-16 items-center justify-between">
-        {/* Logo */}
-        <div className="flex items-center space-x-2">
+        {/* Logo - Agora Clicável */}
+        <div
+          className="flex items-center space-x-2 cursor-pointer" // cursor-pointer e onClick Adicionados
+          onClick={() => navigate("/")}
+        >
           <h1 className="text-2xl font-bold">
             Desabafa<span className="text-primary">Aí</span>
           </h1>

@@ -1,7 +1,6 @@
 /**
  * Página de Regras da Casa
- * 
- * Explica as regras e diretrizes da comunidade
+ * * Explica as regras e diretrizes da comunidade
  * para manter um ambiente seguro e respeitoso
  */
 
@@ -12,26 +11,13 @@ import { Cabecalho } from "@/components/Cabecalho";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { useTheme } from "@/hooks/use-theme"; // Importação Corrigida
 
 const RegrasConvivencia = () => {
   const navigate = useNavigate();
-  const [temaEscuro, setTemaEscuro] = useState(
-    document.documentElement.classList.contains("dark")
-  );
-
-  const alternarTema = () => {
-    setTemaEscuro((prev) => {
-      const novoTema = !prev;
-      if (novoTema) {
-        document.documentElement.classList.add("dark");
-        localStorage.setItem("tema", "escuro");
-      } else {
-        document.documentElement.classList.remove("dark");
-        localStorage.setItem("tema", "claro");
-      }
-      return novoTema;
-    });
-  };
+  
+  // USA O HOOK DE TEMA AGORA
+  const { temaEscuro, alternarTema } = useTheme(); //
 
   return (
     <div className="min-h-screen bg-background">
