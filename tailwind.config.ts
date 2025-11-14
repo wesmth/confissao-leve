@@ -55,6 +55,7 @@ export default {
         /* Cores para categorias específicas */
         desabafo: "hsl(var(--categoria-desabafo))",
         confissao: "hsl(var(--categoria-confissao))",
+        fofoca: "hsl(var(--categoria-fofoca))",
         trending: "hsl(var(--trending))",
         novo: "hsl(var(--novo))",
       },

@@ -20,7 +20,7 @@ import { formatarTempoAtras } from "@/lib/utilidades";
 interface CartaoPostProps {
   post: {
     id: number;
-    tipo: "desabafo" | "confissao";
+    tipo: "desabafo" | "confissao" | "fofoca";
     conteudo: string;
     dataPublicacao: string;
     totalComentarios: number;
@@ -33,8 +33,8 @@ interface CartaoPostProps {
 
 export function CartaoPost({ post, aoClicar }: CartaoPostProps) {
   // Define a cor da badge baseado no tipo
-  const corCategoria = post.tipo === "confissao" ? "confissao" : "desabafo";
-  const textoCategoria = post.tipo === "confissao" ? "Confissão" : "Desabafo";
+  const corCategoria = post.tipo === "confissao" ? "confissao" : post.tipo === "fofoca" ? "trending" : "desabafo";
+  const textoCategoria = post.tipo === "confissao" ? "Confissão" : post.tipo === "fofoca" ? "Fofoca" : "Desabafo";
 
   return (
     <Card
@@ -49,6 +49,8 @@ export function CartaoPost({ post, aoClicar }: CartaoPostProps) {
               className={`${
                 post.tipo === "confissao"
                   ? "bg-confissao text-white"
+                  : post.tipo === "fofoca"
+                  ? "bg-trending text-white"
                   : "bg-desabafo text-white"
               }`}
             >

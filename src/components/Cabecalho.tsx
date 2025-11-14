@@ -84,13 +84,17 @@ export function Cabecalho({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  Perfil
+                <DropdownMenuItem asChild>
+                  <a href="/perfil" className="flex items-center cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    Perfil
+                  </a>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Mudar Plano
+                <DropdownMenuItem asChild>
+                  <a href="/premium" className="flex items-center cursor-pointer">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Mudar Plano
+                  </a>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={aoClicarLogout}>

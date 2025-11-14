@@ -12,9 +12,9 @@ import { Separator } from "@/components/ui/separator";
 
 interface BarraFiltrosProps {
   filtroOrdem: "emAlta" | "recentes";
-  filtroCategoria: "tudo" | "desabafo" | "confissao";
+  filtroCategoria: "tudo" | "desabafo" | "confissao" | "fofoca";
   aoMudarOrdem: (ordem: "emAlta" | "recentes") => void;
-  aoMudarCategoria: (categoria: "tudo" | "desabafo" | "confissao") => void;
+  aoMudarCategoria: (categoria: "tudo" | "desabafo" | "confissao" | "fofoca") => void;
 }
 
 export function BarraFiltros({
@@ -41,6 +41,7 @@ export function BarraFiltros({
           <TabsTrigger value="tudo">Tudo</TabsTrigger>
           <TabsTrigger value="desabafo">Desabafos</TabsTrigger>
           <TabsTrigger value="confissao">Confissões</TabsTrigger>
+          <TabsTrigger value="fofoca">Fofocas</TabsTrigger>
         </TabsList>
       </Tabs>
     </div>

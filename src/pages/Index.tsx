@@ -20,7 +20,7 @@ import { gerarAvatarPlaceholder } from "@/lib/utilidades";
 // Tipo para os posts
 interface Post {
   id: number;
-  tipo: "desabafo" | "confissao";
+  tipo: "desabafo" | "confissao" | "fofoca";
   conteudo: string;
   dataPublicacao: string;
   totalComentarios: number;
@@ -103,7 +103,7 @@ const Index = () => {
   
   // Estados dos filtros
   const [filtroOrdem, setFiltroOrdem] = useState<"emAlta" | "recentes">("emAlta");
-  const [filtroCategoria, setFiltroCategoria] = useState<"tudo" | "desabafo" | "confissao">("tudo");
+  const [filtroCategoria, setFiltroCategoria] = useState<"tudo" | "desabafo" | "confissao" | "fofoca">("tudo");
   
   // Estados dos posts
   const [posts, setPosts] = useState<Post[]>(POSTS_MOCK);
@@ -170,7 +170,7 @@ const Index = () => {
   };
 
   // Cria um novo post
-  const handlePostar = (conteudo: string, categoria: "desabafo" | "confissao") => {
+  const handlePostar = (conteudo: string, categoria: "desabafo" | "confissao" | "fofoca") => {
     if (!estaLogado) {
       toast({
         title: "Ops!",
@@ -248,7 +248,7 @@ const Index = () => {
       <main className="container py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Coluna Principal - Feed */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 lg:min-h-screen">
             {/* Barra de Filtros */}
             <BarraFiltros
               filtroOrdem={filtroOrdem}
@@ -275,8 +275,8 @@ const Index = () => {
             </div>
           </div>
 
-          {/* Coluna Lateral */}
-          <div className="space-y-6">
+          {/* Coluna Lateral - Sticky */}
+          <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">
             {/* Caixa de Postar */}
             <CaixaPostar aoPostar={handlePostar} />
 
@@ -310,12 +310,12 @@ const Index = () => {
             {/* Rodapé */}
             <div className="text-center space-y-2 text-xs text-muted-foreground pt-4">
               <p>
-                <a href="#" className="hover:underline">
-                  Sobre
+                <a href="/regras" className="hover:underline">
+                  Regras da Casa
                 </a>
                 {" • "}
-                <a href="#" className="hover:underline">
-                  Termos de Uso
+                <a href="/premium" className="hover:underline">
+                  Premium
                 </a>
               </p>
               <p className="font-medium">
