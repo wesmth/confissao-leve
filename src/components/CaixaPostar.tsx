@@ -18,13 +18,13 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface CaixaPostarProps {
-  aoPostar: (conteudo: string, categoria: "desabafo" | "confissao") => void;
+  aoPostar: (conteudo: string, categoria: "desabafo" | "confissao" | "fofoca") => void;
   estaCarregando?: boolean;
 }
 
 export function CaixaPostar({ aoPostar, estaCarregando = false }: CaixaPostarProps) {
   const [conteudo, setConteudo] = useState("");
-  const [categoria, setCategoria] = useState<"desabafo" | "confissao">("desabafo");
+  const [categoria, setCategoria] = useState<"desabafo" | "confissao" | "fofoca">("desabafo");
   
   const LIMITE_CARACTERES = 50000;
   const totalCaracteres = conteudo.length;
@@ -65,7 +65,7 @@ export function CaixaPostar({ aoPostar, estaCarregando = false }: CaixaPostarPro
           </Label>
           <RadioGroup
             value={categoria}
-            onValueChange={(value) => setCategoria(value as "desabafo" | "confissao")}
+            onValueChange={(value) => setCategoria(value as "desabafo" | "confissao" | "fofoca")}
             className="flex gap-2"
           >
             <div className="flex items-center space-x-2">
@@ -86,6 +86,15 @@ export function CaixaPostar({ aoPostar, estaCarregando = false }: CaixaPostarPro
                 Confissão
               </Label>
             </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="fofoca" id="fofoca" />
+              <Label
+                htmlFor="fofoca"
+                className="cursor-pointer text-sm font-medium"
+              >
+                Fofoca
+              </Label>
+            </div>
           </RadioGroup>
         </div>
 
@@ -104,7 +113,7 @@ export function CaixaPostar({ aoPostar, estaCarregando = false }: CaixaPostarPro
       <div className="px-6 pb-4">
         <p className="text-xs text-center text-muted-foreground">
           Ao postar, você concorda com nossas{" "}
-          <a href="#" className="text-primary hover:underline">
+          <a href="/regras" className="text-primary hover:underline">
             Regras da Casa
           </a>
           .

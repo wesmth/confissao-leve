@@ -62,10 +62,13 @@ export function StatusUsuario({
         {/* Botão Premium */}
         <Button
           onClick={aoClicarPremium}
+          asChild
           className="w-full bg-gradient-to-r from-secondary to-trending hover:opacity-90"
         >
-          <Sparkles className="mr-2 h-4 w-4" />
-          Vire Premium (Ilimitado!)
+          <a href="/premium">
+            <Sparkles className="mr-2 h-4 w-4" />
+            Vire Premium (Ilimitado!)
+          </a>
         </Button>
       </CardContent>
     </Card>

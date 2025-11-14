@@ -48,6 +48,7 @@ All colors MUST be HSL.
     /* Categorias específicas */
     --categoria-desabafo: 200 85% 45%;
     --categoria-confissao: 40 95% 55%;
+    --categoria-fofoca: 280 65% 60%;
     
     /* Estados especiais */
     --trending: 280 65% 60%;
@@ -102,6 +103,7 @@ All colors MUST be HSL.
     /* Categorias no dark */
     --categoria-desabafo: 200 80% 55%;
     --categoria-confissao: 40 90% 60%;
+    --categoria-fofoca: 280 60% 65%;
     
     /* Estados especiais no dark */
     --trending: 280 60% 65%;
