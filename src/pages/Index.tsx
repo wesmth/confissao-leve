@@ -1,3 +1,5 @@
+// src/pages/Index.tsx (CÓDIGO COMPLETO E FINAL COM LÓGICA DE ANONIMATO)
+
 /**
  * Página Principal - DesabafaAí
  * * Página inicial do aplicativo que contém:
@@ -7,353 +9,334 @@
  * - Sistema de temas (claro/escuro)
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react"; 
 import { Cabecalho } from "@/components/Cabecalho";
 import { CartaoPost } from "@/components/CartaoPost";
 import { CaixaPostar } from "@/components/CaixaPostar";
 import { BarraFiltros } from "@/components/BarraFiltros";
 import { StatusUsuario } from "@/components/StatusUsuario";
 import { useToast } from "@/hooks/use-toast";
-import { gerarAvatarPlaceholder } from "@/lib/utilidades";
-import { useTheme } from "@/hooks/use-theme"; // Importação Corrigida
+import { useTheme } from "@/hooks/use-theme";
+import { useAuth } from "@/hooks/use-auth"; 
+import { Button } from "@/components/ui/button"; 
+import { supabase } from "@/lib/supabase"; 
+import { LogIn } from "lucide-react"; 
+import { formatarTempoAtras } from "@/lib/utilidades"; // Assumindo esta importação
 
-// Tipo para os posts
-interface Post {
-  id: number;
-  tipo: "desabafo" | "confissao" | "fofoca";
-  conteudo: string;
-  dataPublicacao: string;
-  totalComentarios: number;
-  totalReacoes: number;
-  emAlta?: boolean;
-  novo?: boolean;
+// --- Tipagem ---
+export interface Post {
+    id: string; // UUID do DB
+    autor_id: string | null; 
+    tipo: "desabafo" | "confissao" | "fofoca";
+    conteudo: string;
+    criado_em: string; 
+    total_comentarios: number;
+    total_reacoes: number;
+    em_alta: boolean;
+    autor_apelido: string | null;
 }
 
-// Dados mock para demonstração
-const POSTS_MOCK: Post[] = [
-  {
-    id: 1,
-    tipo: "desabafo" as const,
-    conteudo:
-      "Não aguento mais meu chefe. Ele fica pedindo coisas de última hora e acha que eu sou um robô. Hoje ele pediu pra eu refazer um relatório inteiro 10 minutos antes da reunião. Sério, estou no meu limite e quase mandei tudo praquele lugar.",
-    dataPublicacao: "2025-11-14T10:30:00Z",
-    totalComentarios: 18,
-    totalReacoes: 42,
-    emAlta: true,
-    novo: false,
-  },
-  {
-    id: 2,
-    tipo: "confissao" as const,
-    conteudo:
-      "Tenho um fetiche muito forte por pés. O problema é que isso tá tomando conta da minha vida. No outro dia, numa reunião de trabalho, a câmera de uma colega caiu e filmou ela descalça. Quase não consegui me concentrar. É bizarro.",
-    dataPublicacao: "2025-11-14T09:15:00Z",
-    totalComentarios: 5,
-    totalReacoes: 12,
-    emAlta: false,
-    novo: true,
-  },
-  {
-    id: 3,
-    tipo: "desabafo" as const,
-    conteudo:
-      'Cansei, sabe? Tenho um carro e moro sozinho. Parece que meus "amigos" só lembram que eu existo quando precisam de carona pra festa ou um lugar pra fazer "esquenta". Ninguém me chama pra um café ou pra saber como eu tô de verdade.',
-    dataPublicacao: "2025-11-13T15:00:00Z",
-    totalComentarios: 32,
-    totalReacoes: 87,
-    emAlta: true,
-    novo: false,
-  },
-  {
-    id: 4,
-    tipo: "confissao" as const,
-    conteudo:
-      "Eu roubei dinheiro do cofrinho da minha sobrinha de 5 anos pra comprar cerveja. Sei que é horrível, mas eu estava desesperado. Depois repus em dobro, mas a culpa não passa.",
-    dataPublicacao: "2025-11-13T12:20:00Z",
-    totalComentarios: 15,
-    totalReacoes: 8,
-    emAlta: false,
-    novo: false,
-  },
-  {
-    id: 5,
-    tipo: "desabafo" as const,
-    conteudo:
-      "Descobri que meu melhor amigo está saindo com minha ex às minhas costas. Eles acham que eu não sei, mas vi as mensagens. Me sinto traído duas vezes. Não sei se confronto ou simplesmente sumo da vida deles.",
-    dataPublicacao: "2025-11-13T08:45:00Z",
-    totalComentarios: 45,
-    totalReacoes: 103,
-    emAlta: true,
-    novo: false,
-  },
-  // Mais posts mockados para simular a rolagem
-  {
-    id: 6,
-    tipo: "desabafo" as const,
-    conteudo: "Meu TCC está me matando, sério. Não durmo faz três dias e meu orientador só critica. A pressão é insuportável.",
-    dataPublicacao: "2025-11-12T10:00:00Z",
-    totalComentarios: 10,
-    totalReacoes: 30,
-    emAlta: false,
-    novo: false,
-  },
-  {
-    id: 7,
-    tipo: "fofoca" as const,
-    conteudo: "A vizinha do 501 tá saindo escondido com o porteiro novo. Vi os dois de mãos dadas no elevador de serviço! Choque total na vizinhança. Mas shhh, segredo!",
-    dataPublicacao: "2025-11-11T14:30:00Z",
-    totalComentarios: 50,
-    totalReacoes: 150,
-    emAlta: true,
-    novo: false,
-  },
-  {
-    id: 8,
-    tipo: "confissao" as const,
-    conteudo: "Eu nunca assisti Star Wars. Fingi que assisti a vida toda pra não ser excluído dos papos nerds. Desculpa, mundo.",
-    dataPublicacao: "2025-11-11T09:00:00Z",
-    totalComentarios: 5,
-    totalReacoes: 10,
-    emAlta: false,
-    novo: false,
-  },
-  {
-    id: 9,
-    tipo: "desabafo" as const,
-    conteudo: "Minha gata me odeia. Ela só me dá patada e morde quando eu tento fazer carinho. Eu só queria um pouco de amor felino, é pedir muito?",
-    dataPublicacao: "2025-11-10T18:00:00Z",
-    totalComentarios: 20,
-    totalReacoes: 60,
-    emAlta: false,
-    novo: false,
-  },
-  {
-    id: 10,
-    tipo: "desabafo" as const,
-    conteudo: "Acho que sou a única pessoa do meu ciclo social que não tem dinheiro para viajar. Fico vendo as fotos e dá uma inveja triste, saca? Queria ter mais sorte na vida profissional.",
-    dataPublicacao: "2025-11-09T11:00:00Z",
-    totalComentarios: 25,
-    totalReacoes: 75,
-    emAlta: true,
-    novo: false,
-  },
-];
+interface PostFromDB {
+    id: string; 
+    autor_id: string | null; 
+    tipo: "desabafo" | "confissao" | "fofoca";
+    conteudo: string;
+    created_at: string; // O nome REAL que vem do DB
+    total_comentarios: number;
+    total_reacoes: number;
+    em_alta: boolean;
+    status: string; // Adicionado para evitar o erro 400
+    profiles: {
+        apelido: string;
+    } | null;
+}
+
+
+// --- Componente auxiliar: Aviso de Login (Simples) ---
+const AvisoLoginCard = () => (
+    <div className="p-6 space-y-4 bg-card border rounded-lg shadow-lg animate-fade-in text-center">
+      <LogIn className="h-8 w-8 text-primary mx-auto mb-2" />
+      <h3 className="text-xl font-bold">Quase lá!</h3>
+      <p className="text-sm text-muted-foreground">
+        Faça login no cabeçalho para poder postar seu desabafo.
+      </p>
+    </div>
+);
+
+
+// --- 2. COMPONENTE PRINCIPAL ---
 
 const Index = () => {
-  const { toast } = useToast();
-  
-  // USA O HOOK DE TEMA AGORA
-  const { temaEscuro, alternarTema } = useTheme();
-
-  // Estados da aplicação
-  const [estaLogado, setEstaLogado] = useState(false);
-  const [usuario, setUsuario] = useState({
-    apelido: "Anônimo",
-    avatar: "",
-    postsHoje: 0,
-    comentariosHoje: 0,
-  });
-  
-  // Estados dos filtros
-  const [filtroOrdem, setFiltroOrdem] = useState<"emAlta" | "recentes">("emAlta");
-  const [filtroCategoria, setFiltroCategoria] = useState<"tudo" | "desabafo" | "confissao" | "fofoca">("tudo");
-  
-  // Estados dos posts
-  const [posts, setPosts] = useState<Post[]>(POSTS_MOCK);
-
-  // Simula o login do usuário
-  const handleLogin = () => {
-    // Aqui viria a integração com autenticação real (Google OAuth, etc.)
-    toast({
-      title: "Bem-vindo!",
-      description: "Login simulado com sucesso. Crie seu apelido.",
-    });
+    const { toast } = useToast();
+    const { temaEscuro, alternarTema } = useTheme(); 
     
-    // Simula usuário logado
-    const apelidoSimulado = "JamantaBombada";
-    setUsuario({
-      apelido: apelidoSimulado,
-      avatar: gerarAvatarPlaceholder(apelidoSimulado),
-      postsHoje: 0,
-      comentariosHoje: 1,
-    });
-    setEstaLogado(true);
-  };
+    // Usa HOOKS GLOBAIS
+    const { 
+        usuario, 
+        estaLogado, 
+        estaCarregando,
+        atualizarPostsComentarios
+    } = useAuth(); 
 
-  // Faz logout do usuário
-  const handleLogout = () => {
-    setEstaLogado(false);
-    setUsuario({
-      apelido: "Anônimo",
-      avatar: "",
-      postsHoje: 0,
-      comentariosHoje: 0,
-    });
-    
-    toast({
-      title: "Até logo!",
-      description: "Você saiu da sua conta.",
-    });
-  };
+    // Estados
+    const [filtroOrdem, setFiltroOrdem] = useState<"emAlta" | "recentes">("emAlta");
+    const [filtroCategoria, setFiltroCategoria] = useState<"tudo" | "desabafo" | "confissao" | "fofoca">("tudo");
+    const [posts, setPosts] = useState<Post[]>([]); 
+    const [carregandoPosts, setCarregandoPosts] = useState(true);
 
-  // Cria um novo post
-  const handlePostar = (conteudo: string, categoria: "desabafo" | "confissao" | "fofoca") => {
-    if (!estaLogado) {
-      toast({
-        title: "Ops!",
-        description: "Você precisa estar logado para postar.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // --- Lógica de Busca de Posts (Feed) - CORRIGIDA AQUI ---
+    const fetchPosts = useCallback(async () => {
+        setCarregandoPosts(true);
 
-    // Verifica limite de posts (usuário gratuito)
-    if (usuario.postsHoje >= 1) {
-      toast({
-        title: "Limite atingido",
-        description: "Você já fez seu post de hoje. Vire Premium para postar sem limites!",
-        variant: "destructive",
-      });
-      return;
-    }
+        // CORREÇÃO FINAL 400: LISTA EXPLÍCITA DE COLUNAS (created_at)
+        let query = supabase
+          .from('posts')
+          .select(`
+            id,
+            autor_id,
+            tipo,
+            conteudo,
+            created_at,
+            total_comentarios,
+            total_reacoes,
+            em_alta,
+            profiles (apelido)
+          `);
+          
+        if (filtroCategoria !== "tudo") {
+          query = query.eq('tipo', filtroCategoria);
+        }
+        
+        // ORDEM CORRETA: usa 'created_at' (nome do banco)
+        if (filtroOrdem === "recentes") {
+          query = query.order('created_at', { ascending: false });
+        } else { 
+          query = query.order('total_reacoes', { ascending: false });
+          query = query.order('created_at', { ascending: false }); 
+        }
 
-    // Cria o novo post
-    const novoPost: Post = {
-      id: Date.now(),
-      tipo: categoria,
-      conteudo,
-      dataPublicacao: new Date().toISOString(),
-      totalComentarios: 0,
-      totalReacoes: 0,
-      novo: true,
-      emAlta: false,
+        // CORREÇÃO FINAL 400: Filtra por 'status' (Assumindo que você rodou o SQL para criar a coluna!)
+        query = query.eq('status', 'ativo'); 
+
+        const { data, error } = await query.limit(50); 
+
+        if (error) {
+          console.error("Erro ao buscar posts:", error);
+          toast({ title: "Erro de Feed", description: "Não foi possível carregar os posts. (Erro 400 - Colunas/RLS)", variant: "destructive" });
+          setCarregandoPosts(false);
+          return;
+        }
+
+        // Mapeamento: Converte created_at (DB) para criado_em (Interface React)
+        const mappedPosts: Post[] = data.map((item: PostFromDB) => ({
+          ...item,
+          criado_em: item.created_at, // <<-- MAPEAMENTO AQUI
+          autor_apelido: item.profiles?.apelido || null, 
+        }));
+        
+        setPosts(mappedPosts);
+        setCarregandoPosts(false);
+    }, [filtroCategoria, filtroOrdem, toast]);
+
+
+    // Efeito para carregar os posts
+    useEffect(() => {
+      fetchPosts();
+    }, [fetchPosts]);
+
+
+    // --- Lógica de Postagem Real - CORRIGIDA PARA ANONIMATO ---
+    // Adicionado o terceiro parâmetro 'compartilharNome'
+    const handlePostar = async (conteudo: string, categoria: "desabafo" | "confissao" | "fofoca", compartilharNome: boolean) => {
+        if (!estaLogado || !usuario) {
+          toast({ title: "Ops!", description: "Você precisa estar logado para postar.", variant: "destructive" });
+          return;
+        }
+
+        const limiteMaximoPosts = usuario.plano === "gratuito" ? 1 : Infinity;
+        if (usuario.limites.postsDiarios >= limiteMaximoPosts) {
+          toast({ title: "Limite atingido", description: "Você já fez seu post de hoje. Vire Premium!", variant: "destructive" });
+          return;
+        }
+        
+        // CORREÇÃO DE ANONIMATO: Se for para compartilhar o nome, usa o ID. Senão, usa NULL.
+        const autorId = compartilharNome ? usuario.id : null; 
+        
+        const novoPostData = {
+          autor_id: autorId, // AGORA É NULL se for anônimo!
+          tipo: categoria,
+          conteudo: conteudo,
+        };
+        
+        // Seleciona todas as colunas necessárias, incluindo o nome real do DB: created_at
+        const { data: newPostArray, error } = await supabase
+          .from('posts')
+          .insert([novoPostData])
+          .select(`
+            id,
+            autor_id,
+            tipo,
+            conteudo,
+            created_at,
+            total_comentarios,
+            total_reacoes,
+            em_alta,
+            profiles (apelido)
+          `); 
+
+        if (error) {
+          console.error("Erro ao postar:", error);
+          // Se o erro for de NOT NULL ou RLS, avisa.
+          toast({ title: "Erro na Postagem", description: error.message + " (Verifique o SQL de Anonimato!)", variant: "destructive" });
+          return;
+        }
+
+        // Mapeamento: Converte created_at (DB) para criado_em (Interface React)
+        const novoPost: Post = newPostArray.map((item: PostFromDB) => ({
+            ...item,
+            criado_em: item.created_at, 
+            autor_apelido: item.profiles?.apelido || null, 
+        }))[0];
+        
+        setPosts((prev) => [novoPost, ...prev]); 
+        atualizarPostsComentarios("post", 1); 
+
+        toast({ title: "Post publicado!", description: "Seu desabafo foi compartilhado." });
     };
 
-    setPosts((prev) => [novoPost, ...prev]);
-    setUsuario((prev) => ({ ...prev, postsHoje: prev.postsHoje + 1 }));
 
-    toast({
-      title: "Post publicado!",
-      description: "Seu desabafo foi compartilhado com a comunidade.",
-    });
-  };
+    // --- Funções Auxiliares (INTACTAS) ---
+    const handleCommentCountUpdate = (postId: string, newCount: number) => {
+      setPosts(prevPosts =>
+        prevPosts.map(post =>
+          post.id === postId ? { ...post, total_comentarios: newCount } : post
+        )
+      );
+    };
+    
+    const abrirPost = (postId: string) => {
+      toast({ title: "Em desenvolvimento", description: `Abrindo post #${postId}...` });
+    };
 
-  // Filtra os posts baseado nos filtros selecionados
-  const postsFiltrados = posts
-    .filter((post) => {
-      if (filtroCategoria === "tudo") return true;
-      return post.tipo === filtroCategoria;
-    })
-    .sort((a, b) => {
-      if (filtroOrdem === "emAlta") {
-        return b.totalReacoes - a.totalReacoes;
-      }
-      return new Date(b.dataPublicacao).getTime() - new Date(a.dataPublicacao).getTime();
-    });
+    const isNovo = (post: Post) => {
+      const dataPostagem = new Date(post.criado_em);
+      const vinteQuatroHorasAtras = new Date(new Date().getTime() - (24 * 60 * 60 * 1000));
+      return dataPostagem > vinteQuatroHorasAtras;
+    };
 
-  // Abre detalhes do post (implementar depois)
-  const abrirPost = (postId: number) => {
-    toast({
-      title: "Em desenvolvimento",
-      description: `Abrindo post #${postId}...`,
-    });
-  };
+    if (estaCarregando) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
+        </div>
+      );
+    }
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Cabeçalho */}
-      <Cabecalho
-        temaEscuro={temaEscuro}
-        alternarTema={alternarTema}
-        estaLogado={estaLogado}
-        usuario={estaLogado ? usuario : undefined}
-        aoClicarLogin={handleLogin}
-        aoClicarLogout={handleLogout}
-      />
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Cabeçalho */}
+        <Cabecalho /> 
 
-      {/* Conteúdo Principal */}
-      <main className="container py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Coluna Principal - Feed */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Barra de Filtros */}
-            <BarraFiltros
-              filtroOrdem={filtroOrdem}
-              filtroCategoria={filtroCategoria}
-              aoMudarOrdem={setFiltroOrdem}
-              aoMudarCategoria={setFiltroCategoria}
-            />
-
-            {/* Lista de Posts */}
-            <div className="space-y-4">
-              {postsFiltrados.length === 0 ? (
-                <p className="text-center text-muted-foreground py-12">
-                  Nenhum post encontrado com esses filtros.
-                </p>
-              ) : (
-                postsFiltrados.map((post) => (
-                  <CartaoPost
-                    key={post.id}
-                    post={post}
-                    aoClicar={() => abrirPost(post.id)}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Coluna Lateral - Sticky */}
-          <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">
-            {/* Caixa de Postar */}
-            <CaixaPostar aoPostar={handlePostar} />
-
-            {/* Status do Usuário (apenas se logado) */}
-            {estaLogado && (
-              <StatusUsuario
-                postsHoje={usuario.postsHoje}
-                comentariosHoje={usuario.comentariosHoje}
-                limitePostsDiarios={1}
-                limiteComentariosDiarios={3}
-                aoClicarPremium={() =>
-                  toast({
-                    title: "Premium",
-                    description: "Página de upgrade em desenvolvimento!",
-                  })
-                }
+        {/* Conteúdo Principal */}
+        <main className="container py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Coluna Principal - Feed */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Barra de Filtros */}
+              <BarraFiltros
+                filtroOrdem={filtroOrdem}
+                filtroCategoria={filtroCategoria}
+                aoMudarOrdem={setFiltroOrdem}
+                aoMudarCategoria={setFiltroCategoria}
               />
-            )}
 
-            {/* Placeholder de Anúncio */}
-            <div className="hidden lg:block">
-              <div className="bg-muted rounded-lg h-64 flex items-center justify-center border-2 border-dashed border-border">
-                <p className="text-sm text-muted-foreground">
-                  Espaço Publicitário
-                  <br />
-                  300x250
-                </p>
+              {/* Lista de Posts */}
+              <div className="space-y-4">
+                {carregandoPosts ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
+                    <p className="ml-3 text-muted-foreground">Carregando posts...</p>
+                  </div>
+                ) : posts.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-12">
+                    Nenhum post encontrado com esses filtros. Seja o primeiro a postar!
+                  </p>
+                ) : (
+                  posts.map((post) => (
+                    <CartaoPost
+                      key={post.id}
+                      post={{
+                          id: post.id,
+                          tipo: post.tipo,
+                          conteudo: post.conteudo,
+                          dataPublicacao: post.criado_em, 
+                          totalComentarios: post.total_comentarios,
+                          totalReacoes: post.total_reacoes,
+                          emAlta: post.em_alta,
+                          novo: isNovo(post),
+                          autor: post.autor_apelido, 
+                      }}
+                      aoClicar={() => abrirPost(post.id)}
+                      onCommentCountUpdate={handleCommentCountUpdate} 
+                    />
+                  ))
+                )}
               </div>
             </div>
 
-            {/* Rodapé */}
-            <div className="text-center space-y-2 text-xs text-muted-foreground pt-4">
-              <p>
-                <a href="/regras" className="hover:underline">
-                  Regras da Casa
-                </a>
-                {" • "}
-                <a href="/premium" className="hover:underline">
-                  Premium
-                </a>
-              </p>
-              <p className="font-medium">
-                Um projeto de <span className="text-primary">Weslen Matheus</span>
-              </p>
+            {/* Coluna Lateral - Sticky */}
+            <div className="space-y-6 lg:sticky lg:top-20 lg:self-start">
+              
+              {/* Caixa de Postar ou Aviso de Login */}
+              {estaLogado && !estaCarregando ? (
+                  // A chamada de função agora passa o terceiro parâmetro de anonimato
+                  <CaixaPostar aoPostar={handlePostar} estaCarregando={false} />
+              ) : (
+                  <AvisoLoginCard />
+              )}
+
+              {/* Status do Usuário (apenas se logado) */}
+              {estaLogado && usuario && (
+                <StatusUsuario
+                  postsHoje={usuario.limites.postsDiarios}
+                  comentariosHoje={usuario.limites.comentariosDiarios}
+                  limitePostsDiarios={usuario.plano === "gratuito" ? 1 : Infinity}
+                  limiteComentariosDiarios={usuario.plano === "gratuito" ? 3 : Infinity}
+                  aoClicarPremium={() => toast({ title: "Premium", description: "Página de upgrade em desenvolvimento!", })}
+                />
+              )}
+
+              {/* Placeholder de Anúncio */}
+              <div className="hidden lg:block">
+                <div className="bg-muted rounded-lg h-64 flex items-center justify-center border-2 border-dashed border-border">
+                  <p className="text-sm text-muted-foreground">
+                    Espaço Publicitário
+                    <br />
+                    300x250
+                  </p>
+                </div>
+              </div>
+
+              {/* Rodapé */}
+              <div className="text-center space-y-2 text-xs text-muted-foreground pt-4">
+                <p>
+                  <a href="/regras" className="hover:underline">
+                    Regras da Casa
+                  </a>
+                  {" • "}
+                  <a href="/premium" className="hover:underline">
+                    Premium
+                  </a>
+                </p>
+                <p className="font-medium">
+                  Um projeto de <span className="text-primary">Weslen Matheus</span>
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
-  );
+        </main>
+      </div>
+    );
 };
 
 export default Index;

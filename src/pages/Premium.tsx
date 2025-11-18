@@ -2,40 +2,97 @@
  * Página Premium
  * * Mostra os benefícios do plano premium
  * e permite upgrade por R$ 9,90/mês
+ * REFATORADO: Usa useAuth para gerenciar status de login e plano.
  */
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, Sparkles, Zap, Crown, Star } from "lucide-react";
+import { ArrowLeft, Check, Sparkles, Zap, Crown, Star, LogIn } from "lucide-react";
 import { Cabecalho } from "@/components/Cabecalho";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useTheme } from "@/hooks/use-theme"; // Importação Corrigida
+
+// HOOKS GLOBAIS (Novas Importações)
+import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme"; 
 
 const Premium = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // USA O HOOK DE TEMA AGORA
-  const { temaEscuro, alternarTema } = useTheme(); //
+  // 1. Usa HOOKS GLOBAIS
+  const { usuario, estaLogado, estaCarregando, tornarPremium } = useAuth();
+  const { temaEscuro, alternarTema } = useTheme();
 
+  // 2. Define o status
+  const isPremium = usuario?.plano === "premium";
+  
+  // 3. Função de Assinatura (Simulação de Pagamento)
   const handleAssinar = () => {
+    if (!estaLogado) {
+      toast({
+        title: "Entre na sua conta!",
+        description: "Você precisa estar logado para assinar o Plano Premium.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Simula o processo de pagamento
     toast({
-      title: "Funcionalidade em desenvolvimento",
-      description: "A integração com pagamentos será implementada em breve!",
+      title: "Simulando Pagamento...",
+      description: "Processando transação segura de R$ 9,90. Aguarde...",
     });
+    
+    // Simula a resposta positiva da API de Pagamento
+    setTimeout(() => {
+        // Chama a função do Contexto para atualizar o estado do usuário
+        tornarPremium();
+        
+        toast({
+            title: "Parabéns! 👑",
+            description: "Upgrade Premium concluído! Acesso total liberado. 🎉",
+            duration: 5000
+        });
+    }, 2000);
   };
+  
+  // Loader
+  if (estaCarregando) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
+        </div>
+      );
+  }
+
+  // Card de Aviso se Não Estiver Logado
+  const NotLoggedInCard = () => (
+      <Card className="border-2 border-dashed border-destructive/50 bg-destructive/5 my-8">
+          <CardHeader>
+              <CardTitle className="text-destructive flex items-center gap-2">
+                  <LogIn className="h-5 w-5" /> Faça Login
+              </CardTitle>
+              <CardDescription>
+                  Entre na sua conta (ou crie um apelido) para poder assinar o plano e liberar os recursos Premium.
+              </CardDescription>
+          </CardHeader>
+          <CardContent>
+              <Button onClick={() => navigate("/")} className="w-full">
+                  Voltar e Entrar
+              </Button>
+          </CardContent>
+      </Card>
+  );
+
 
   return (
     <div className="min-h-screen bg-background">
+      {/* O Cabecalho não precisa mais de props de tema e logout */}
       <Cabecalho
-        temaEscuro={temaEscuro}
-        alternarTema={alternarTema}
-        estaLogado={false}
-        aoClicarLogin={() => {}}
-        aoClicarLogout={() => {}}
+        aoClicarLogin={() => navigate("/")}
       />
 
       <main className="container py-8 max-w-6xl">
@@ -49,27 +106,33 @@ const Premium = () => {
           Voltar ao Feed
         </Button>
 
-        {/* Header */}
+        {/* Header (Adaptação para Premium Ativo) */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-secondary to-trending mb-4">
             <Sparkles className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-4xl font-bold mb-3">
-            Vire Premium e Desabafe Sem Limites!
+            {isPremium ? "SEU PLANO ESTÁ ATIVO! 🥳" : "Vire Premium e Desabafe Sem Limites!"}
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Desbloqueie recursos exclusivos por apenas <strong>R$ 9,90/mês</strong>
+            {isPremium 
+                ? `Parabéns, ${usuario?.apelido}! Você tem acesso ILIMITADO e total aos recursos Premium.`
+                : "Desbloqueie recursos exclusivos por apenas R$ 9,90/mês"
+            }
           </p>
         </div>
+        
+        {/* Aviso de Login se não estiver logado */}
+        {!estaLogado && <NotLoggedInCard />}
 
         {/* Comparação de Planos */}
         <div className="grid md:grid-cols-2 gap-8 mb-12">
           {/* Plano Gratuito */}
-          <Card className="relative">
+          <Card className={`relative ${isPremium ? 'opacity-70' : ''}`}> {/* Opacidade para mostrar que é inferior */}
             <CardHeader>
               <div className="flex items-center justify-between mb-2">
                 <CardTitle>Plano Gratuito</CardTitle>
-                <Badge variant="outline">Atual</Badge>
+                <Badge variant="outline">{!isPremium ? "Atual" : "Anterior"}</Badge>
               </div>
               <CardDescription className="text-2xl font-bold">
                 R$ 0<span className="text-sm font-normal text-muted-foreground">/mês</span>
@@ -107,11 +170,11 @@ const Premium = () => {
           </Card>
 
           {/* Plano Premium */}
-          <Card className="relative border-primary shadow-lg shadow-primary/20">
+          <Card className={`relative border-primary shadow-lg ${isPremium ? 'border-4 shadow-primary/40' : 'shadow-primary/20'}`}>
             <div className="absolute -top-4 left-1/2 -translate-x-1/2">
               <Badge className="bg-gradient-to-r from-secondary to-trending text-white px-4 py-1">
                 <Crown className="mr-1 h-3 w-3" />
-                Mais Popular
+                {isPremium ? "Plano ATIVO" : "Mais Popular"}
               </Badge>
             </div>
             
@@ -156,14 +219,25 @@ const Premium = () => {
                 </div>
               </div>
 
-              <Button 
-                onClick={handleAssinar}
-                className="w-full bg-gradient-to-r from-secondary to-trending hover:opacity-90 text-white mt-6"
-                size="lg"
-              >
-                <Zap className="mr-2 h-5 w-5" />
-                Assinar Agora
-              </Button>
+              {isPremium ? (
+                <Button 
+                    disabled
+                    className="w-full bg-primary mt-6 cursor-default"
+                    size="lg"
+                >
+                    Plano Ativo!
+                </Button>
+              ) : (
+                <Button 
+                    onClick={handleAssinar}
+                    disabled={!estaLogado}
+                    className="w-full bg-gradient-to-r from-secondary to-trending hover:opacity-90 text-white mt-6"
+                    size="lg"
+                >
+                    <Zap className="mr-2 h-5 w-5" />
+                    Assinar Agora
+                </Button>
+              )}
               
               <p className="text-xs text-center text-muted-foreground mt-2">
                 Cancele quando quiser • Sem compromisso

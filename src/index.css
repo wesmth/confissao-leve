@@ -45,10 +45,10 @@ All colors MUST be HSL.
     --input: 210 20% 88%;
     --ring: 200 85% 45%;
 
-    /* Categorias específicas */
-    --categoria-desabafo: 200 85% 45%;
-    --categoria-confissao: 40 95% 55%;
-    --categoria-fofoca: 280 65% 60%;
+    /* Categorias específicas (CORRIGIDO) */
+    --categoria-desabafo: 240 80% 55%; /* Azul/Roxo */
+    --categoria-confissao: 0 85% 55%; /* Vermelho */
+    --categoria-fofoca: 40 90% 60%; /* Laranja/Amarelo */
     
     /* Estados especiais */
     --trending: 280 65% 60%;
@@ -100,10 +100,10 @@ All colors MUST be HSL.
     --input: 220 15% 22%;
     --ring: 200 80% 55%;
 
-    /* Categorias no dark */
-    --categoria-desabafo: 200 80% 55%;
-    --categoria-confissao: 40 90% 60%;
-    --categoria-fofoca: 280 60% 65%;
+    /* Categorias no dark (CORRIGIDO) */
+    --categoria-desabafo: 240 80% 55%;
+    --categoria-confissao: 0 85% 55%;
+    --categoria-fofoca: 40 90% 60%;
     
     /* Estados especiais no dark */
     --trending: 280 60% 65%;
@@ -184,5 +184,16 @@ All colors MUST be HSL.
   .hover-lift:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
+  }
+  
+  /* Classes HSL Dinâmicas (ADICIONADO para que CartaoPost funcione) */
+  .bg-categoria-desabafo {
+      background-color: hsl(var(--categoria-desabafo));
+  }
+  .bg-categoria-confissao {
+      background-color: hsl(var(--categoria-confissao));
+  }
+  .bg-categoria-fofoca {
+      background-color: hsl(var(--categoria-fofoca));
   }
 }
