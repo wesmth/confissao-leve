@@ -1,4 +1,4 @@
-// src/pages/Index.tsx (CÓDIGO COMPLETO E FINAL COM LÓGICA DE ANONIMATO)
+// src/pages/Index.tsx (CÓDIGO COMPLETO COM FILTRO DE 24 HORAS)
 
 /**
  * Página Principal - DesabafaAí
@@ -21,7 +21,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button"; 
 import { supabase } from "@/lib/supabase"; 
 import { LogIn } from "lucide-react"; 
-import { formatarTempoAtras } from "@/lib/utilidades"; // Assumindo esta importação
+import { formatarTempoAtras } from "@/lib/utilidades"; 
 
 // --- Tipagem ---
 export interface Post {
@@ -29,7 +29,7 @@ export interface Post {
     autor_id: string | null; 
     tipo: "desabafo" | "confissao" | "fofoca";
     conteudo: string;
-    criado_em: string; 
+    criado_em: string; // Criado em (Nome da interface)
     total_comentarios: number;
     total_reacoes: number;
     em_alta: boolean;
@@ -41,11 +41,11 @@ interface PostFromDB {
     autor_id: string | null; 
     tipo: "desabafo" | "confissao" | "fofoca";
     conteudo: string;
-    created_at: string; // O nome REAL que vem do DB
+    created_at: string; // created_at (Nome real do DB)
     total_comentarios: number;
     total_reacoes: number;
     em_alta: boolean;
-    status: string; // Adicionado para evitar o erro 400
+    status: string;
     profiles: {
         apelido: string;
     } | null;
@@ -68,7 +68,6 @@ const AvisoLoginCard = () => (
 
 const Index = () => {
     const { toast } = useToast();
-    const { temaEscuro, alternarTema } = useTheme(); 
     
     // Usa HOOKS GLOBAIS
     const { 
@@ -84,11 +83,10 @@ const Index = () => {
     const [posts, setPosts] = useState<Post[]>([]); 
     const [carregandoPosts, setCarregandoPosts] = useState(true);
 
-    // --- Lógica de Busca de Posts (Feed) - CORRIGIDA AQUI ---
+    // --- Lógica de Busca de Posts (Feed) - CORRIGIDA COM FILTRO DE 24H ---
     const fetchPosts = useCallback(async () => {
         setCarregandoPosts(true);
 
-        // CORREÇÃO FINAL 400: LISTA EXPLÍCITA DE COLUNAS (created_at)
         let query = supabase
           .from('posts')
           .select(`
@@ -107,22 +105,31 @@ const Index = () => {
           query = query.eq('tipo', filtroCategoria);
         }
         
-        // ORDEM CORRETA: usa 'created_at' (nome do banco)
+        // NOVO FILTRO: Se for "Recentes", filtra pelas últimas 24 horas
         if (filtroOrdem === "recentes") {
-          query = query.order('created_at', { ascending: false });
+            // Calcula o timestamp de 24 horas atrás no formato ISO
+            const twentyFourHoursAgo = new Date(new Date().getTime() - (24 * 60 * 60 * 1000)).toISOString();
+            
+            // Adiciona o filtro: created_at >= 24 horas atrás
+            query = query.gte('created_at', twentyFourHoursAgo);
+            
+            // Ordena apenas pelo mais recente
+            query = query.order('created_at', { ascending: false });
+            
         } else { 
-          query = query.order('total_reacoes', { ascending: false });
-          query = query.order('created_at', { ascending: false }); 
+            // Lógica original para "Em Alta"
+            query = query.order('total_reacoes', { ascending: false });
+            query = query.order('created_at', { ascending: false }); 
         }
 
-        // CORREÇÃO FINAL 400: Filtra por 'status' (Assumindo que você rodou o SQL para criar a coluna!)
+        // Filtro base: posts ativos
         query = query.eq('status', 'ativo'); 
 
         const { data, error } = await query.limit(50); 
 
         if (error) {
           console.error("Erro ao buscar posts:", error);
-          toast({ title: "Erro de Feed", description: "Não foi possível carregar os posts. (Erro 400 - Colunas/RLS)", variant: "destructive" });
+          toast({ title: "Erro de Feed", description: "Não foi possível carregar os posts.", variant: "destructive" });
           setCarregandoPosts(false);
           return;
         }
@@ -145,8 +152,7 @@ const Index = () => {
     }, [fetchPosts]);
 
 
-    // --- Lógica de Postagem Real - CORRIGIDA PARA ANONIMATO ---
-    // Adicionado o terceiro parâmetro 'compartilharNome'
+    // --- Lógica de Postagem Real ---
     const handlePostar = async (conteudo: string, categoria: "desabafo" | "confissao" | "fofoca", compartilharNome: boolean) => {
         if (!estaLogado || !usuario) {
           toast({ title: "Ops!", description: "Você precisa estar logado para postar.", variant: "destructive" });
@@ -163,7 +169,7 @@ const Index = () => {
         const autorId = compartilharNome ? usuario.id : null; 
         
         const novoPostData = {
-          autor_id: autorId, // AGORA É NULL se for anônimo!
+          autor_id: autorId, 
           tipo: categoria,
           conteudo: conteudo,
         };
@@ -186,8 +192,7 @@ const Index = () => {
 
         if (error) {
           console.error("Erro ao postar:", error);
-          // Se o erro for de NOT NULL ou RLS, avisa.
-          toast({ title: "Erro na Postagem", description: error.message + " (Verifique o SQL de Anonimato!)", variant: "destructive" });
+          toast({ title: "Erro na Postagem", description: error.message, variant: "destructive" });
           return;
         }
 
@@ -205,7 +210,7 @@ const Index = () => {
     };
 
 
-    // --- Funções Auxiliares (INTACTAS) ---
+    // --- Funções Auxiliares ---
     const handleCommentCountUpdate = (postId: string, newCount: number) => {
       setPosts(prevPosts =>
         prevPosts.map(post =>
@@ -289,7 +294,6 @@ const Index = () => {
               
               {/* Caixa de Postar ou Aviso de Login */}
               {estaLogado && !estaCarregando ? (
-                  // A chamada de função agora passa o terceiro parâmetro de anonimato
                   <CaixaPostar aoPostar={handlePostar} estaCarregando={false} />
               ) : (
                   <AvisoLoginCard />
