@@ -1,4 +1,4 @@
-// src/pages/Index.tsx (CÓDIGO COMPLETO COM FILTRO DE 24 HORAS)
+// src/pages/Index.tsx (CÓDIGO COMPLETO)
 
 /**
  * Página Principal - DesabafaAí
@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase"; 
 import { LogIn } from "lucide-react"; 
 import { formatarTempoAtras } from "@/lib/utilidades"; 
+import { useNavigate } from "react-router-dom"; // <-- NOVO IMPORT
 
 // --- Tipagem ---
 export interface Post {
@@ -68,7 +69,8 @@ const AvisoLoginCard = () => (
 
 const Index = () => {
     const { toast } = useToast();
-    
+    const navigate = useNavigate(); // <-- INICIALIZAÇÃO
+
     // Usa HOOKS GLOBAIS
     const { 
         usuario, 
@@ -219,8 +221,9 @@ const Index = () => {
       );
     };
     
+    // FUNÇÃO RECORRIGIDA
     const abrirPost = (postId: string) => {
-      toast({ title: "Em desenvolvimento", description: `Abrindo post #${postId}...` });
+      navigate(`/post/${postId}`); // <-- AGORA NAVEGA PARA O DETALHE!
     };
 
     const isNovo = (post: Post) => {
@@ -306,7 +309,7 @@ const Index = () => {
                   comentariosHoje={usuario.limites.comentariosDiarios}
                   limitePostsDiarios={usuario.plano === "gratuito" ? 1 : Infinity}
                   limiteComentariosDiarios={usuario.plano === "gratuito" ? 3 : Infinity}
-                  aoClicarPremium={() => toast({ title: "Premium", description: "Página de upgrade em desenvolvimento!", })}
+                  aoClicarPremium={() => navigate("/premium")} // CORRIGIDO PARA USAR navigate
                 />
               )}
 

@@ -1,3 +1,5 @@
+// src/App.tsx (CÓDIGO COMPLETO)
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,6 +13,7 @@ import Perfil from "./pages/Perfil";
 import RegrasConvivencia from "./pages/RegrasConvivencia";
 import Premium from "./pages/Premium";
 import NotFound from "./pages/NotFound";
+import PostDetalhe from "./pages/PostDetalhe"; // <-- NOVO IMPORT
 
 const queryClient = new QueryClient();
 
@@ -29,6 +32,10 @@ const App = () => (
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/regras" element={<RegrasConvivencia />} />
             <Route path="/premium" element={<Premium />} />
+            
+            {/* ROTA DO DETALHE DO POST: RECEBE O ID PELA URL */}
+            <Route path="/post/:id" element={<PostDetalhe />} /> 
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
