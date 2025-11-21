@@ -1,23 +1,13 @@
 // src/pages/Perfil.tsx
 
-/**
- * Página de Perfil do Usuário
- * * Permite o usuário:
- * - Visualizar e editar suas informações
- * - Ver estatísticas de posts e comentários
- * - Gerenciar configurações de privacidade
- * - Ver seu histórico de posts
- * * REFATORADO: Agora usa useAuth e lógica real.
- */
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, User, Settings, BarChart3, FileText, XCircle, Ban } from "lucide-react";
-import { format } from "date-fns"; // Para formatar datas
-import { ptBR } from "date-fns/locale"; // Para formatação em português
-import { Cabecalho } from "@/components/Cabecalho";
+import { ArrowLeft, User, Settings, BarChart3, FileText, Loader2, Filter, Ban, Heart, MessageCircle } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { supabase } from "@/lib/supabase"; 
 
-// Componentes UI
+import { Cabecalho } from "@/components/Cabecalho";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,10 +15,11 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { NavLink } from "@/components/NavLink";
 
-// Diálogos de Confirmação
+import { CartaoPost } from "@/components/CartaoPost";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,74 +31,170 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-// HOOKS GLOBAIS
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme"; 
+
+// Interface para o Histórico
+interface PostHistorico {
+    id: string;
+    autor_id: string | null; // ID DO AUTOR AQUI É OBRIGATÓRIO
+    tipo: "desabafo" | "confissao" | "fofoca";
+    conteudo: string;
+    created_at: string;
+    total_comentarios: number;
+    total_reacoes: number;
+    em_alta: boolean;
+    status: string;
+    anonimo: boolean;
+    ja_curtiu: boolean;
+    profiles: {
+        apelido: string;
+    } | null;
+}
 
 const Perfil = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // 1. Usa HOOKS GLOBAIS (Removido useState simulado)
   const { usuario, estaCarregando, estaLogado, updateUsuario, logout } = useAuth();
   const { temaEscuro, alternarTema } = useTheme();
 
-  // Estados locais para edição
+  // Estados Perfil
   const [novoApelido, setNovoApelido] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [mudancaAnonimato, setMudancaAnonimato] = useState(false);
+
+  // Estados Histórico
+  const [meusPosts, setMeusPosts] = useState<PostHistorico[]>([]);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [filtroHistorico, setFiltroHistorico] = useState<"recentes" | "antigas" | "populares">("recentes");
   
-  // Efeito para sincronizar o novoApelido com o apelido atual do usuário
+  // Estado Estatísticas Gerais
+  const [estatisticas, setEstatisticas] = useState({ publicacoes: 0, interacoes: 0 });
+
+  // Sincronização inicial dos dados do usuário
   useEffect(() => {
     if (usuario) {
       setNovoApelido(usuario.apelido);
-      // Sincroniza o estado local do anonimato
       setMudancaAnonimato(usuario.mostrarApelidoPublicamente);
     } else if (!estaCarregando && !estaLogado) {
-        // Se não está logado, redireciona para a home
         navigate('/');
     }
   }, [usuario, estaCarregando, estaLogado, navigate]);
 
+  // --- 1. Busca Estatísticas Reais (Blindado) ---
+  useEffect(() => {
+    const fetchStats = async () => {
+        if (!usuario?.id) return;
 
-  // Verifica se o apelido pode ser trocado (lógica baseada no limite do use-auth)
+        // Busca apenas as colunas de números para somar
+        const { data, error } = await supabase
+            .from('posts')
+            .select('total_comentarios, total_reacoes')
+            .eq('autor_id', usuario.id);
+
+        if (!error && data) {
+            const totalPubs = data.length;
+            
+            // SOMA ROBUSTA: Garante que null vira 0 para não quebrar a conta
+            const totalInteracoes = data.reduce((acc, curr) => {
+                const comentarios = curr.total_comentarios || 0;
+                const reacoes = curr.total_reacoes || 0;
+                return acc + comentarios + reacoes;
+            }, 0);
+            
+            setEstatisticas({ 
+                publicacoes: totalPubs, 
+                interacoes: totalInteracoes 
+            });
+        } else if (error) {
+            console.error("Erro ao buscar estatísticas:", error);
+        }
+    };
+
+    fetchStats();
+  }, [usuario?.id]); 
+
+
+  // --- 2. Lógica do Histórico ---
+  const buscarMeusPosts = useCallback(async () => {
+      if (!usuario?.id) return;
+      
+      setCarregandoHistorico(true);
+      try {
+          // AQUI ESTÁ A CORREÇÃO DO PROFILES (profiles!posts_autor_id_fkey)
+          let query = supabase
+              .from('posts')
+              .select(`
+                  *,
+                  profiles:profiles!posts_autor_id_fkey (apelido)
+              `)
+              .eq('autor_id', usuario.id); 
+
+          // Aplica Ordenação
+          if (filtroHistorico === 'recentes') {
+              query = query.order('created_at', { ascending: false });
+          } else if (filtroHistorico === 'antigas') {
+              query = query.order('created_at', { ascending: true });
+          } else if (filtroHistorico === 'populares') {
+              query = query.order('total_reacoes', { ascending: false }).order('total_comentarios', { ascending: false });
+          }
+
+          const { data, error } = await query;
+          if (error) throw error;
+
+          // Mapeamento para garantir tipos
+          const postsMapeados = (data || []).map((p: any) => ({
+              ...p,
+              anonimo: p.anonimo ?? false,
+              ja_curtiu: false 
+          }));
+
+          setMeusPosts(postsMapeados);
+
+      } catch (error) {
+          console.error("Erro ao buscar histórico:", error);
+          toast({ title: "Erro", description: "Não foi possível carregar seu histórico.", variant: "destructive" });
+      } finally {
+          setCarregandoHistorico(false);
+      }
+  }, [usuario?.id, filtroHistorico, toast]);
+
+  // Carrega histórico quando muda o usuário ou o filtro
+  useEffect(() => {
+      if (usuario?.id) {
+          buscarMeusPosts();
+      }
+  }, [buscarMeusPosts]);
+
+
+  // --- Funções Auxiliares de Perfil ---
   const apelidoPodeSerTrocado = () => {
     if (usuario?.plano === "premium") return true;
-    if (!usuario?.proximaTrocaApelido) return true; // Se o campo for nulo no DB, pode trocar
-    
+    if (!usuario?.proximaTrocaApelido) return true;
     const dataLimite = new Date(usuario.proximaTrocaApelido);
     return new Date() > dataLimite;
   };
 
   const handleSalvarApelido = async () => {
     if (!usuario || salvando) return;
-
     if (novoApelido.length < 3) {
       toast({ title: "Erro", description: "O apelido deve ter no mínimo 3 caracteres.", variant: "destructive" });
       return;
     }
-    
-    if (novoApelido === usuario.apelido) {
-        toast({ title: "Nada a Salvar", description: "O novo apelido é igual ao atual." });
-        return;
-    }
+    if (novoApelido === usuario.apelido) return;
 
     if (!apelidoPodeSerTrocado()) {
-        toast({ title: "Aguarde", description: `Você só poderá trocar o apelido novamente após ${format(new Date(usuario.proximaTrocaApelido), 'dd/MM/yyyy', { locale: ptBR })}.`, variant: "destructive" });
+        toast({ title: "Aguarde", description: `Troca disponível em ${format(new Date(usuario.proximaTrocaApelido), 'dd/MM/yyyy', { locale: ptBR })}.`, variant: "destructive" });
         return;
     }
     
-    // ATENÇÃO: Aqui você faria a chamada real ao Supabase para atualizar o perfil
     setSalvando(true);
-    
-    // Simulação da chamada DB
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Atualiza o estado local e reseta o próximo tempo de troca (Exemplo: daqui a 30 dias)
     const proximaTroca = new Date();
-    proximaTroca.setDate(proximaTroca.getDate() + 30); // 30 dias para a próxima troca (exemplo gratuito)
+    proximaTroca.setDate(proximaTroca.getDate() + 30); 
 
     updateUsuario({ 
         apelido: novoApelido,
@@ -121,28 +208,19 @@ const Perfil = () => {
   const handleToggleAnonimato = (checked: boolean) => {
     setMudancaAnonimato(checked);
     updateUsuario({ mostrarApelidoPublicamente: checked });
-    toast({ 
-        title: "Preferência Salva", 
-        description: checked ? "Seu apelido será mostrado por padrão nos posts futuros." : "Posts futuros voltarão a ser anônimos por padrão." 
-    });
   };
 
   const handleExcluirConta = async () => {
-    // ATENÇÃO: Aqui você faria a chamada real ao Supabase para deletar a conta.
-    // Isso requer uma chave de serviço ou a exclusão pelo próprio usuário no cliente.
-    
-    toast({ title: "Simulação", description: "Tentativa de exclusão de conta em desenvolvimento...", variant: "destructive" });
-    
-    // Simula logout após exclusão
-    setTimeout(async () => {
-        await logout();
-        navigate('/');
-        toast({ title: "Conta Excluída", description: "Sua conta foi permanentemente deletada. Que pena!", variant: "destructive" });
-    }, 1500);
+    toast({ title: "Atenção", description: "Entre em contato com o suporte para excluir.", variant: "destructive" });
   };
   
+  const isNovo = (dataString: string) => {
+      const dataPostagem = new Date(dataString);
+      const vinteQuatroHorasAtras = new Date(Date.now() - (24 * 60 * 60 * 1000));
+      return dataPostagem > vinteQuatroHorasAtras;
+  };
+
   if (estaCarregando || !usuario) {
-    // Tela de carregamento enquanto busca o perfil
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
@@ -151,14 +229,10 @@ const Perfil = () => {
   }
 
   const dataCadastroFormatada = format(new Date(usuario.dataCadastro), 'dd/MM/yyyy', { locale: ptBR });
-  
-  const dataProximaTroca = apelidoPodeSerTrocado() 
-    ? 'Disponível Agora' 
-    : format(new Date(usuario.proximaTrocaApelido), 'dd/MM/yyyy', { locale: ptBR });
+  const dataProximaTroca = apelidoPodeSerTrocado() ? 'Disponível Agora' : format(new Date(usuario.proximaTrocaApelido), 'dd/MM/yyyy', { locale: ptBR });
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Cabeçalho (Passa os props corretos) */}
       <Cabecalho
         temaEscuro={temaEscuro}
         alternarTema={alternarTema}
@@ -168,12 +242,11 @@ const Perfil = () => {
         aoClicarLogout={logout}
       />
 
-      <main className="container py-8 max-w-4xl">
-        {/* Botão voltar */}
+      <main className="container py-8 max-w-4xl px-4 md:px-6">
         <Button
           variant="ghost"
           onClick={() => navigate("/")}
-          className="mb-6 text-muted-foreground hover:text-foreground"
+          className="mb-6 text-muted-foreground hover:text-foreground pl-0 hover:bg-transparent"
         >
           <ArrowLeft className="mr-2 h-4 w-4" /> Voltar ao Feed
         </Button>
@@ -184,129 +257,125 @@ const Perfil = () => {
         </h1>
 
         <Tabs defaultValue="dados" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:w-auto">
-            <TabsTrigger value="dados" className="flex items-center">
-              <User className="mr-2 h-4 w-4" /> Dados
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="dados">
+              <User className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Dados</span>
             </TabsTrigger>
-            <TabsTrigger value="config" className="flex items-center">
-              <Settings className="mr-2 h-4 w-4" /> Configurações
+            <TabsTrigger value="config">
+              <Settings className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Configurações</span>
             </TabsTrigger>
-            <TabsTrigger value="historico" className="flex items-center">
-              <FileText className="mr-2 h-4 w-4" /> Histórico
+            <TabsTrigger value="historico">
+              <FileText className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Histórico</span>
             </TabsTrigger>
           </TabsList>
           
-          {/* Aba de Dados */}
-          <TabsContent value="dados" className="mt-6 space-y-6">
-            <Card className="animate-fade-in">
+          {/* === ABA DE DADOS === */}
+          <TabsContent value="dados" className="space-y-6 animate-fade-in">
+            <Card>
               <CardHeader>
                 <CardTitle>Informações Básicas</CardTitle>
-                <CardDescription>
-                  Seu apelido é único. Você só pode trocá-lo uma vez por mês (Plano Gratuito).
-                </CardDescription>
+                <CardDescription>Gerencie sua identidade no Confissão Leve.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                
-                {/* Avatar e Apelido Atual */}
-                <div className="flex items-center space-x-4">
-                    <Avatar className="h-20 w-20 border-2 border-primary">
+                <div className="flex flex-col sm:flex-row items-center sm:space-x-6 space-y-4 sm:space-y-0">
+                    <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
                         <AvatarImage src={usuario.avatar} alt={usuario.apelido} />
-                        <AvatarFallback className="text-xl font-bold">{usuario.apelido[0].toUpperCase()}</AvatarFallback>
+                        <AvatarFallback className="text-2xl font-bold">{usuario.apelido[0].toUpperCase()}</AvatarFallback>
                     </Avatar>
-                    <div className="space-y-1">
+                    <div className="text-center sm:text-left space-y-1">
                         <p className="text-2xl font-bold">@{usuario.apelido}</p>
                         <p className="text-sm text-muted-foreground">Membro desde: {dataCadastroFormatada}</p>
-                        <p className="text-sm font-medium text-accent">Plano: {usuario.plano.toUpperCase()}</p>
+                        <div className="flex justify-center sm:justify-start gap-2 pt-1">
+                             <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors border-transparent bg-primary text-primary-foreground">
+                                {usuario.plano.toUpperCase()}
+                             </span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Campo Email (Somente Leitura) */}
-                <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" defaultValue={usuario.email} readOnly disabled type="email" />
-                    <p className="text-xs text-muted-foreground">O email não pode ser alterado por aqui.</p>
-                </div>
-                
-                {/* Campo Novo Apelido */}
-                <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                        <Label htmlFor="apelido">Novo Apelido</Label>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <span className={`text-xs font-medium ${apelidoPodeSerTrocado() ? 'text-accent' : 'text-destructive'}`}>
-                                    Próxima troca: {dataProximaTroca}
-                                </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>No plano gratuito, você pode trocar a cada 30 dias. Premium é ilimitado.</p>
-                            </TooltipContent>
-                        </Tooltip>
+                <div className="grid gap-4">
+                    <div className="space-y-2">
+                        <Label>Email</Label>
+                        <Input defaultValue={usuario.email} readOnly disabled className="bg-muted" />
                     </div>
-                    <Input
-                        id="apelido"
-                        value={novoApelido}
-                        onChange={(e) => setNovoApelido(e.target.value)}
-                        placeholder="Digite seu novo apelido (3-20 caracteres)"
-                        maxLength={20}
-                        disabled={!apelidoPodeSerTrocado()}
-                    />
-                    <Button 
-                        onClick={handleSalvarApelido} 
-                        disabled={!apelidoPodeSerTrocado() || salvando || novoApelido.length < 3}
-                        className="w-full"
-                    >
-                        {salvando ? 'Salvando...' : 'Salvar Novo Apelido'}
-                    </Button>
+                    
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <Label htmlFor="apelido">Novo Apelido</Label>
+                            <span className={`text-xs ${apelidoPodeSerTrocado() ? 'text-green-500' : 'text-orange-500'}`}>
+                                {dataProximaTroca}
+                            </span>
+                        </div>
+                        <div className="flex gap-2">
+                            <Input
+                                id="apelido"
+                                value={novoApelido}
+                                onChange={(e) => setNovoApelido(e.target.value)}
+                                placeholder="Novo apelido"
+                                maxLength={20}
+                                disabled={!apelidoPodeSerTrocado()}
+                            />
+                            <Button 
+                                onClick={handleSalvarApelido} 
+                                disabled={!apelidoPodeSerTrocado() || salvando || novoApelido.length < 3}
+                            >
+                                {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar'}
+                            </Button>
+                        </div>
+                        <p className="text-[0.8rem] text-muted-foreground">
+                            Mínimo de 3 caracteres. Sem espaços.
+                        </p>
+                    </div>
                 </div>
-
               </CardContent>
             </Card>
 
-            {/* Estatísticas (Placeholder) */}
-            <Card className="animate-fade-in">
+            {/* === ESTATÍSTICAS ATUALIZADAS === */}
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                    <BarChart3 className="mr-2 h-5 w-5" />
-                    Estatísticas da Conta
+                <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Engajamento Total
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-primary">{usuario.limites.postsDiarios + 1}</p>
-                        <p className="text-sm text-muted-foreground">Posts Feitos</p>
+                <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className="p-4 bg-muted/30 rounded-xl border hover:bg-muted/50 transition-colors">
+                        <div className="flex justify-center mb-2">
+                            <FileText className="h-6 w-6 text-primary opacity-80" />
+                        </div>
+                        <p className="text-3xl font-bold text-foreground">{estatisticas.publicacoes}</p>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
+                            Publicações
+                        </p>
                     </div>
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-primary">{usuario.limites.comentariosDiarios + 3}</p>
-                        <p className="text-sm text-muted-foreground">Comentários</p>
-                    </div>
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-primary">15</p>
-                        <p className="text-sm text-muted-foreground">Reações Recebidas</p>
+                    <div className="p-4 bg-muted/30 rounded-xl border hover:bg-muted/50 transition-colors">
+                        <div className="flex justify-center mb-2 gap-1">
+                             <Heart className="h-4 w-4 text-red-500" />
+                             <MessageCircle className="h-4 w-4 text-blue-500" />
+                        </div>
+                        <p className="text-3xl font-bold text-foreground">{estatisticas.interacoes}</p>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
+                            Interações
+                        </p>
                     </div>
                 </div>
               </CardContent>
             </Card>
-
           </TabsContent>
           
-          {/* Aba de Configurações */}
-          <TabsContent value="config" className="mt-6 space-y-6">
-            <Card className="animate-fade-in">
+          {/* === ABA DE CONFIGURAÇÕES === */}
+          <TabsContent value="config" className="space-y-6 animate-fade-in">
+            <Card>
               <CardHeader>
-                <CardTitle>Configurações de Privacidade</CardTitle>
-                <CardDescription>
-                  Controle como seus dados são exibidos.
-                </CardDescription>
+                <CardTitle>Privacidade</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                
-                {/* Toggle de Anonimato Padrão */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
                   <div className="space-y-0.5">
-                    <Label>Mostrar Apelido por Padrão</Label>
+                    <Label className="text-base">Identificação Pública</Label>
                     <p className="text-sm text-muted-foreground">
-                      Por padrão, posts são anônimos (OFF). Ative para mostrar seu apelido por padrão. Você decide post a post.
+                      Mostrar meu apelido por padrão ao criar novos posts.
                     </p>
                   </div>
                   <Switch
@@ -315,61 +384,96 @@ const Perfil = () => {
                   />
                 </div>
                 
-                {/* Zona de Perigo */}
-                <div className="pt-4 border-t">
-                  <h4 className="font-medium mb-2 text-destructive flex items-center"><Ban className="mr-2 h-4 w-4" /> Zona de Perigo</h4>
-                  
-                  {/* Diálogo de Exclusão de Conta */}
+                <div className="pt-6 border-t">
+                  <h4 className="text-sm font-medium text-destructive mb-4 flex items-center gap-2">
+                      <Ban className="h-4 w-4" /> Zona de Perigo
+                  </h4>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" className="w-full">
-                        Excluir Conta
-                      </Button>
+                      <Button variant="destructive" className="w-full sm:w-auto">Excluir Conta</Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
+                        <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Esta ação é **irreversível**. Todos os seus posts, comentários e dados de perfil serão permanentemente excluídos dos nossos servidores. Você perderá seu apelido `{usuario.apelido}`.
+                          Essa ação apagará seus dados permanentemente. Seus posts anônimos continuarão existindo, mas sem vínculo com você.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction 
-                          onClick={handleExcluirConta}
-                          className="bg-destructive hover:bg-destructive/90"
-                        >
-                          Sim, Excluir Minha Conta
+                        <AlertDialogAction onClick={handleExcluirConta} className="bg-destructive hover:bg-destructive/90">
+                          Sim, Excluir
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
-
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Esta ação é irreversível. Pense bem, caralho.
-                  </p>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
           
-          {/* Aba de Histórico (Placeholder) */}
-          <TabsContent value="historico" className="mt-6">
-            <Card className="animate-fade-in">
-              <CardHeader>
-                <CardTitle>Seu Histórico de Atividades</CardTitle>
-                <CardDescription>
-                  Aqui você verá todos os seus posts e comentários (públicos e anônimos) num só lugar.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="p-8 bg-muted rounded-lg text-center space-y-2">
-                    <FileText className="h-8 w-8 text-primary mx-auto" />
-                    <p className="font-medium">Histórico de posts em desenvolvimento...</p>
-                    <p className="text-sm text-muted-foreground">Volte em breve para ver tudo que você já tirou do peito.</p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* === ABA DE HISTÓRICO === */}
+          <TabsContent value="historico" className="mt-6 space-y-6 animate-fade-in">
+             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+                 <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Seus Posts ({meusPosts.length})
+                 </h3>
+                 
+                 <div className="flex items-center gap-2 w-full sm:w-auto">
+                     <Filter className="h-4 w-4 text-muted-foreground" />
+                     <Select 
+                        value={filtroHistorico} 
+                        onValueChange={(val: any) => setFiltroHistorico(val)}
+                     >
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Filtrar por" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="recentes">Mais Recentes</SelectItem>
+                            <SelectItem value="antigas">Mais Antigos</SelectItem>
+                            <SelectItem value="populares">Mais Populares</SelectItem>
+                        </SelectContent>
+                     </Select>
+                 </div>
+             </div>
+
+             {carregandoHistorico ? (
+                 <div className="flex justify-center py-12">
+                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                 </div>
+             ) : meusPosts.length === 0 ? (
+                 <Card className="text-center py-12 border-dashed">
+                     <CardContent>
+                         <p className="text-muted-foreground mb-4">Você ainda não postou nada.</p>
+                         <Button onClick={() => navigate('/')}>Criar meu primeiro post</Button>
+                     </CardContent>
+                 </Card>
+             ) : (
+                 <div className="space-y-4">
+                     {meusPosts.map((post) => (
+                         <CartaoPost
+                            key={post.id}
+                            post={{
+                                id: post.id,
+                                autor_id: post.autor_id, // <--- GARANTINDO QUE O AUTOR_ID É PASSADO
+                                tipo: post.tipo,
+                                conteudo: post.conteudo,
+                                dataPublicacao: post.created_at,
+                                totalComentarios: post.total_comentarios,
+                                totalReacoes: post.total_reacoes,
+                                emAlta: post.em_alta,
+                                novo: isNovo(post.created_at),
+                                autor: post.profiles?.apelido || "Eu", 
+                                anonimo: post.anonimo,
+                                ja_curtiu: false
+                            }}
+                            aoClicar={() => navigate(`/post/${post.id}`)}
+                            onCommentCountUpdate={() => {}} 
+                         />
+                     ))}
+                 </div>
+             )}
           </TabsContent>
 
         </Tabs>
