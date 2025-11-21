@@ -1,57 +1,47 @@
-// src/pages/PostDetalhe.tsx (CÓDIGO COMPLETO)
+// src/pages/PostDetalhe.tsx
 
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, MessageCircle, Heart, User, Sparkles, Clock, Ban, AlertTriangle } from "lucide-react";
+import { ArrowLeft, MessageCircle, Heart, User, Sparkles, Clock, AlertTriangle } from "lucide-react";
 import { Cabecalho } from "@/components/Cabecalho";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { formatarTempoAtras, gerarAvatarPlaceholder } from "@/lib/utilidades"; // Importa utilidades
+import { formatarTempoAtras } from "@/lib/utilidades";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/use-auth";
-import { useTheme } from "@/hooks/use-theme";
-import { useToast } from "@/hooks/use-toast";
-
-// Importa a interface Post do Index.tsx
+import { ListaComentarios } from "@/components/ListaComentarios";
 import { Post } from "./Index"; 
-import { ListaComentarios } from "@/components/ListaComentarios"; // Componente para listar comentários
 
-// Componente para exibir um único Post em formato de card expandido
+// --- Subcomponente: Card do Post Expandido ---
 interface PostExpandidoProps {
     post: Post;
-    isMobile: boolean; // Para adaptar o layout
+    isMobile: boolean;
 }
 
 const PostExpandido = ({ post, isMobile }: PostExpandidoProps) => {
     
-    // Lógica para cor da categoria
     const categoriaClasses: { [key in Post["tipo"]]: string } = {
         desabafo: "bg-desabafo text-desabafo-foreground",
         confissao: "bg-confissao text-confissao-foreground",
         fofoca: "bg-fofoca text-fofoca-foreground",
     };
 
-    // Lógica para Tags
-    const isNovo = (post: Post) => {
+    const isNovo = useMemo(() => {
         const dataPostagem = new Date(post.criado_em);
-        const vinteQuatroHorasAtras = new Date(new Date().getTime() - (24 * 60 * 60 * 1000));
+        const vinteQuatroHorasAtras = new Date(Date.now() - (24 * 60 * 60 * 1000));
         return dataPostagem > vinteQuatroHorasAtras;
-    };
+    }, [post.criado_em]);
     
-    const isEmAlta = post.em_alta && !isNovo(post);
-    
+    const isEmAlta = post.em_alta && !isNovo;
     const autorNome = post.autor_apelido || "Anônimo";
-    const autorAvatar = gerarAvatarPlaceholder(autorNome);
 
     return (
-        <Card className="animate-fade-in shadow-xl border-2">
+        <Card className="animate-fade-in shadow-xl border-2 w-full max-w-full overflow-hidden"> {/* Adicionado overflow-hidden no Card pai por segurança */}
             <CardHeader className="flex flex-col space-y-4">
                 <div className="flex items-center justify-between">
-                    {/* Informações do Autor */}
+                    {/* Autor */}
                     <div className="flex items-center space-x-3">
-                        {/* Avatar (só aparece se não for anônimo) */}
                         {post.autor_apelido && (
                             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                                 <User className="h-4 w-4 text-primary" />
@@ -59,13 +49,12 @@ const PostExpandido = ({ post, isMobile }: PostExpandidoProps) => {
                         )}
                         <p className={`font-semibold text-sm ${post.autor_apelido ? 'text-foreground' : 'text-muted-foreground italic'}`}>
                             @{autorNome}
-                            {/* Badge Premium, se tivesse no objeto Post */}
                         </p>
                     </div>
 
-                    {/* Tags */}
+                    {/* Badges */}
                     <div className="flex items-center space-x-2">
-                        {isNovo(post) && (
+                        {isNovo && (
                             <Badge className="bg-novo text-white hover:bg-novo/80">
                                 <Clock className="h-3 w-3 mr-1" /> Novo
                             </Badge>
@@ -87,12 +76,14 @@ const PostExpandido = ({ post, isMobile }: PostExpandidoProps) => {
                     {post.tipo === 'desabafo' ? 'Desabafo:' : post.tipo === 'confissao' ? 'Confissão:' : 'Fofoca:'}
                 </CardTitle>
             </CardHeader>
-            <CardContent>
-                {/* CONTEÚDO COMPLETO SEM TRUNCAR */}
-                <p className="text-lg whitespace-pre-wrap text-foreground">
+
+            <CardContent className="w-full">
+                {/* AQUI A MÁGICA: break-words força a quebra de palavras longas */}
+                <p className="text-lg whitespace-pre-wrap break-words text-foreground leading-relaxed w-full">
                     {post.conteudo}
                 </p>
             </CardContent>
+
             <CardFooter className="flex justify-between items-center text-sm pt-4">
                 <p className="text-muted-foreground">
                     Publicado {formatarTempoAtras(post.criado_em)}
@@ -112,27 +103,22 @@ const PostExpandido = ({ post, isMobile }: PostExpandidoProps) => {
     );
 };
 
-
-// ----------------------------------------------------
-// PÁGINA PRINCIPAL: PostDetalhe
-// ----------------------------------------------------
+// --- O RESTO DO ARQUIVO CONTINUA IGUAL AO ANTERIOR ---
+// Vou repetir aqui só pra garantir que você tenha o arquivo completo funcional
 
 const PostDetalhe = () => {
-    const { id } = useParams<{ id: string }>(); // Pega o ID da URL
+    const { id } = useParams<{ id: string }>(); 
     const navigate = useNavigate();
-    const { toast } = useToast();
-    const { temaEscuro, alternarTema } = useTheme(); // Para o cabeçalho
-    const { estaLogado, usuario, logout } = useAuth(); // Para o cabeçalho
     
     const [post, setPost] = useState<Post | null>(null);
     const [carregando, setCarregando] = useState(true);
     const [erro, setErro] = useState<string | null>(null);
 
-    // Usa useMobile para passar ao subcomponente (adaptação)
     const isMobile = useMemo(() => window.innerWidth < 768, []); 
 
-    // 1. Lógica de Busca do Post
     useEffect(() => {
+        window.scrollTo(0, 0);
+
         if (!id) {
             setErro("ID do post inválido.");
             setCarregando(false);
@@ -143,7 +129,6 @@ const PostDetalhe = () => {
             setCarregando(true);
             setErro(null);
 
-            // Busca o post por ID
             const { data, error } = await supabase
                 .from('posts')
                 .select(`
@@ -159,7 +144,7 @@ const PostDetalhe = () => {
                     profiles (apelido)
                 `)
                 .eq('id', id)
-                .single(); // Espera apenas um resultado
+                .single();
 
             if (error || !data || data.status !== 'ativo') {
                 setErro("Post não encontrado ou foi removido.");
@@ -167,7 +152,6 @@ const PostDetalhe = () => {
                 return;
             }
 
-            // Mapeia o resultado do DB para a interface Post
             const postMapeado: Post = {
                 ...data,
                 criado_em: data.created_at,
@@ -181,7 +165,15 @@ const PostDetalhe = () => {
         fetchPost();
     }, [id]);
 
-    // Lógica do loader/erro
+    const handleCommentCountUpdate = (_postId: string, newCount: number) => {
+        if (post) {
+            setPost({
+                ...post,
+                total_comentarios: newCount
+            });
+        }
+    };
+
     if (carregando) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-background">
@@ -190,19 +182,18 @@ const PostDetalhe = () => {
         );
     }
 
-    // Se der erro ou 404
     if (erro || !post) {
         return (
             <div className="min-h-screen bg-background">
                  <Cabecalho />
-                <div className="flex min-h-[calc(100vh-64px)] items-center justify-center">
-                    <Card className="text-center p-6 bg-card border rounded-xl shadow-lg animate-fade-in max-w-lg">
-                        <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-4" />
+                <div className="flex min-h-[calc(100vh-64px)] items-center justify-center p-4">
+                    <Card className="text-center p-6 bg-card border rounded-xl shadow-lg max-w-lg w-full">
+                        <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
                         <h1 className="mb-2 text-2xl font-bold text-destructive">Ops!</h1>
                         <p className="mb-6 text-lg text-foreground font-semibold">
                             {erro}
                         </p>
-                        <Button onClick={() => navigate("/")} size="lg">
+                        <Button onClick={() => navigate("/")} size="lg" className="w-full sm:w-auto">
                             Voltar ao Feed Principal
                         </Button>
                     </Card>
@@ -211,41 +202,34 @@ const PostDetalhe = () => {
         );
     }
     
-    // Sucesso
     return (
         <div className="min-h-screen bg-background">
             <Cabecalho />
             
-            <main className="container py-8 max-w-4xl">
-                {/* Botão voltar */}
+            <main className="container py-8 max-w-4xl px-4 sm:px-6 lg:px-8">
                 <Button
                     variant="ghost"
                     onClick={() => navigate("/")}
-                    className="mb-6 text-muted-foreground hover:text-foreground"
+                    className="mb-6 text-muted-foreground hover:text-foreground pl-0 hover:bg-transparent"
                 >
                     <ArrowLeft className="mr-2 h-4 w-4" /> Voltar ao Feed
                 </Button>
 
-                {/* 1. O POST EXPANDIDO */}
                 <PostExpandido post={post} isMobile={isMobile} />
                 
                 <Separator className="my-8" />
                 
-                {/* 2. FEED DE COMENTÁRIOS */}
                 <div className="space-y-6">
                     <h2 className="text-2xl font-bold flex items-center gap-2 text-foreground">
                         <MessageCircle className="h-6 w-6 text-primary" />
                         Comentários ({post.total_comentarios})
                     </h2>
                     
-                    {/* NOVO COMPONENTE: ListaComentarios (Mockado por enquanto, mas usa lógica real) */}
                     <ListaComentarios 
                         postId={post.id} 
-                        // Simula o count update no Card (aqui não precisa, mas é bom manter a prop)
-                        onCommentCountUpdate={() => { /* no-op */ }} 
+                        onCommentCountUpdate={handleCommentCountUpdate} 
                     />
                 </div>
-
             </main>
         </div>
     );
